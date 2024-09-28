@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+
+WINE_PREFIX = os.environ.get("WINEPREFIX")
+if not WINE_PREFIX:
+    WINE_PREFIX = os.path.abspath("wineprefix")
+    os.environ["WINEPREFIX"] = WINE_PREFIX
+    print(f"WARNING: WINEPREFIX not set, defaulting to {WINE_PREFIX}")
+os.environ["WINEARCH"] = "win64"
+
+
+def assert_requirements():
+    if not shutil.which("wine"):
+        print("wine is not installed. Please install it.")
+        sys.exit(1)
+    if not shutil.which("cabextract"):
+        print(
+            "cabextract is not installed. Please install it. In Debian-based systems, you can run:\n    sudo apt-get install cabextract"
+        )
+        sys.exit(1)
+    if not shutil.which("msibuild"):
+        print(
+            "msitools is not installed. Please install it. In Debian-based systems, you can run:\n    sudo apt-get install msitools"
+        )
+        sys.exit(1)
+
+
+def resolve_payload(obj):
+    if isinstance(obj, str):
+        return obj
+    if obj["Packaging"] == "external":
+        # TODO: Defer download until InstallCondition is met (do not download all language packs)
+        url = obj["DownloadUrl"]
+        source_path = obj["SourcePath"]
+        source_path = source_path.replace("\\", "/")
+        id = obj["Id"]
+        if not os.path.exists(source_path):
+            dest_dir = os.path.dirname(source_path)
+            os.makedirs(dest_dir, exist_ok=True)
+            os.system(f"wget {url} -O {source_path}")
+        return source_path
+    elif obj["Packaging"] == "embedded":
+        source_path = obj["SourcePath"]
+        file_path = obj["FilePath"]
+        file_path = file_path.replace("\\", "/")
+        id = obj["Id"]
+        if not os.path.exists(file_path):
+            dest_dir = os.path.dirname(file_path)
+            if dest_dir:
+                os.makedirs(dest_dir, exist_ok=True)
+            os.rename(source_path, file_path)
+        return file_path
+    else:
+        raise Exception(f"Unexpected packaging: {obj['Packaging']}")
+
+
+def extract_wix_file(installer_path):
+    installer_name = os.path.basename(installer_path).replace(".exe", "")
+    build_path = os.path.abspath(f"build/rhino-installer/{installer_name}")
+    installer_path = os.path.abspath(installer_path)
+    os.makedirs(build_path, exist_ok=True)
+    os.chdir(build_path)
+    if not os.path.exists("0"):
+        print(f"Extracting {installer_path} to {build_path}")
+        res = subprocess.run(
+            ["cabextract", installer_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        if res.returncode != 0:
+            raise Exception(
+                f"Failed to extract installer: {installer_path}, cabextract output:\n{res.stdout.decode('utf-8')}"
+            )
+    with open("0", "r") as f:
+        data = f.read()
+    root = ET.fromstring(data)
+
+    variables = {}
+    for n in root.findall(".//{http://schemas.microsoft.com/wix/2008/Burn}Variable"):
+        id = n.attrib["Id"]
+        value = n.attrib.get("Value")
+        variables[id] = value
+    if "BundleVersion" in variables:
+        print(f"Found Rhino Installer version: {variables['BundleVersion']}")
+    else:
+        print(f"WARNING: BundleVersion not found in installer")
+
+    payloads = {}
+    for p in root.findall(".//{http://schemas.microsoft.com/wix/2008/Burn}Payload"):
+        obj = dict(p.attrib)
+        payloads[obj["Id"]] = obj
+        if obj["Packaging"] == "embedded":
+            # For embedded assets, rename eagerly.
+            # ExtExternal assets will be downloaded on demand.
+            resolve_payload(obj)
+
+    return root, payloads, variables
+
+
+def replace_variables(variables, text):
+    vars = re.findall(r"\[(.*?)\]", text)
+    for var in vars:
+        if var in variables:
+            text = text.replace(f"[{var}]", variables[var])
+        else:
+            print(f"WARNING: Variable {var} not found")
+    return text
+
+
+def patch_rhino_msi(installer_path: str):
+    msi_path = "rhino.msi"
+    if not os.path.exists(msi_path):
+        raise Exception(f"MSI not found: {msi_path}")
+    print(f"Patching {msi_path}, see https://bugs.winehq.org/show_bug.cgi?id=56703")
+
+    res = subprocess.run(
+        ["msiinfo", "export", msi_path, "InstallExecuteSequence"],
+        check=True,
+        capture_output=True,
+    )
+    data = res.stdout.decode("utf-8")
+    orig_data = data
+    data, repls = re.subn(
+        r"^InstallCertificates\t.*\t(\d+)\r\n",
+        r'InstallCertificates\tSKIP_INSTALL_CERTIFICATES="0"\t\1\r\n',
+        data,
+        flags=re.MULTILINE,
+    )
+    assert repls == 1
+    data, repls = re.subn(
+        r"^UninstallCertificates\t.*\t(\d+)\r\n",
+        r'UninstallCertificates\tSKIP_UNINSTALL_CERTIFICATES="0"\t\1\r\n',
+        data,
+        flags=re.MULTILINE,
+    )
+    assert repls == 1
+    with open("InstallExecuteSequence.idt", "w") as f:
+        f.write(data)
+    subprocess.run(
+        ["msibuild", msi_path, "-i", "InstallExecuteSequence.idt"], check=True
+    )
+
+    res = subprocess.run(
+        ["msiinfo", "export", msi_path, "Property"], check=True, capture_output=True
+    )
+    data = res.stdout.decode("utf-8")
+    data = data.strip()
+    if "SKIP_INSTALL_CERTIFICATES" not in data:
+        data += "\r\nSKIP_INSTALL_CERTIFICATES\t1"
+    if "SKIP_UNINSTALL_CERTIFICATES" not in data:
+        data += "\r\nSKIP_UNINSTALL_CERTIFICATES\t1"
+    data += "\r\n"
+    with open("Property.idt", "w") as f:
+        f.write(data)
+    subprocess.run(["msibuild", msi_path, "-i", "Property.idt"], check=True)
+
+
+def install_rhino(installer_path, property_overrides):
+    root, payloads, variables = extract_wix_file(installer_path)
+    for k, v in property_overrides.items():
+        variables[k] = v
+    patch_rhino_msi(installer_path)
+    chain = root.find("{http://schemas.microsoft.com/wix/2008/Burn}Chain")
+    if chain is None or len(chain) == 0:
+        raise Exception("Invalid Rhino installer: Chain not found")
+    for n in chain:
+        install_condition = n.get("InstallCondition")
+        if install_condition:
+            facts = {f"{k}={v}" for k, v in variables.items()}
+            if install_condition not in facts:
+                print(f"Skipping: {install_condition}")
+                continue
+        if n.tag == "{http://schemas.microsoft.com/wix/2008/Burn}ExePackage":
+            payload_ref = n.find(
+                "{http://schemas.microsoft.com/wix/2008/Burn}PayloadRef"
+            )
+            if payload_ref is None:
+                print("WARNING: ExePackage without PayloadRef")
+                continue
+            payload_id = payload_ref.attrib["Id"]
+            payload_path = resolve_payload(payloads[payload_id])
+            args = n.attrib.get("InstallArguments", "")
+            print(f"Running: {payload_path} {args}")
+            os.system(f"wine {payload_path} {args}")
+        elif n.tag == "{http://schemas.microsoft.com/wix/2008/Burn}MsiPackage":
+            properties = {}
+            for p in n.findall(
+                "{http://schemas.microsoft.com/wix/2008/Burn}MsiProperty"
+            ):
+                id = p.attrib["Id"]
+                value = p.attrib["Value"]
+                value = replace_variables(variables, value)
+                value = value.strip()
+                if value:
+                    properties[id] = value
+            payload_ref = n.find(
+                "{http://schemas.microsoft.com/wix/2008/Burn}PayloadRef"
+            )
+            if payload_ref is None:
+                print("WARNING: MsiPackage without PayloadRef")
+                continue
+            payload_id = payload_ref.attrib["Id"]
+            payload_path = resolve_payload(payloads[payload_id])
+            if payload_path.endswith("rhino.msi"):
+                # XXX: Allow forcing some hidden properties:
+                for id in ["EULA_AGREE", "RMA_SKIPCA"]:
+                    if id in variables:
+                        properties[id] = variables[id]
+            args = [f'{k}="{v}"' for k, v in properties.items()]
+            if payload_path.endswith("rhino.msi"):
+                # Force /quiet for unattended install
+                args = ["/quiet"] + args
+            cmd = ["wine", "msiexec", "/i", payload_path] + args
+            print(f"Running: {cmd}")
+            res = subprocess.run(
+                cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            )
+            if res.returncode != 0:
+                raise Exception(f"Failed to run msiexec:\n{res.stdout.decode('utf-8')}")
+        else:
+            print(f"WARNING: Unexpected tag: {n.tag}")
+            raise Exception("Unexpected tag")
+
+
+def print_usage():
+    print(
+        "Usage: {} <wix-installer.exe> [PROPERTY_KEY=PROPERTY_VALUE...]".format(
+            sys.argv[0]
+        )
+    )
+
+
+def main():
+    args = sys.argv
+    progname = args
+    args = args[1:]
+    if args and args[0] == "-h":
+        print_usage()
+        sys.exit(0)
+    assert_requirements()
+    if not args:
+        print("ERROR: Missing installer path")
+        print_usage()
+        sys.exit(1)
+    installer_path = args[0]
+    args = args[1:]
+    property_overrides = {v.split("=")[0]: v.split("=")[1] for v in args}
+    install_rhino(installer_path, property_overrides)
+
+
+if __name__ == "__main__":
+    main()

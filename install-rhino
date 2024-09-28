@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -eux
+
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+MAJOR_VERSION=7
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      echo "Usage: $0"
+      echo "  -h, --help: Show this help message"
+      exit 0
+      ;;
+    -v|--version)
+      MAJOR_VERSION="$2"
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+export WINEARCH="${WINEARCH:-win64}"
+export WINEPREFIX="${WINEPREFIX:-$SCRIPT_DIR/wineprefix}"
+export TOOLS_CACHE="$SCRIPT_DIR/build/tools"
+
+run() {
+  local log_name="$1" log_path
+  shift
+  log_path="$SCRIPT_DIR/wineprefix/$log_name.log"
+  echo "Running: $*"
+  echo "Running: $*" >"$log_path"
+  "$@" >>"$log_path" 2>&1
+}
+
+RHINO_INSTALLER_URL="$(curl -s -D - "https://www.rhino3d.com/www-api/download/direct/?slug=rhino-for-windows/$MAJOR_VERSION/latest/" -o /dev/null | grep '^Location' | cut -d' ' -f2 | sed -e 's~[\r\n]~~g')"
+if [[ -z "$RHINO_INSTALLER_URL" ]]; then
+  echo "Failed to get Rhino installer URL"
+  exit 1
+fi
+RHINO_INSTALLER="$(basename "$RHINO_INSTALLER_URL")"
+
+# wine-9.0, check that major is at least 9
+WINE_VERSION="$(wine --version)"
+WINE_VERSION="${WINE_VERSION/wine-}"
+WINE_VERSION="${WINE_VERSION%%.*}"
+if [[ "$WINE_VERSION" -lt 9 ]]; then
+  echo "Wine version is too old, please install wine-9.0 or newer"
+  exit 1
+fi
+
+if [[ ! -e "$TOOLS_CACHE/winetricks" ]]; then
+  mkdir -p "$TOOLS_CACHE"
+  wget -q -O "$TOOLS_CACHE/winetricks" "https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
+  chmod +x "$TOOLS_CACHE/winetricks"
+fi
+
+if [[ ! -e "$TOOLS_CACHE/$RHINO_INSTALLER" ]]; then
+  mkdir -p "$TOOLS_CACHE"
+  wget -q -O "$TOOLS_CACHE/$RHINO_INSTALLER" "$RHINO_INSTALLER_URL"
+fi
+
+if [[ ! -f ~/.cache/wine/wine-gecko-2.47.4-x86_64.msi ]]; then
+  mkdir -p ~/.cache/wine
+  # TODO: install debug symbols
+  wget -q -O ~/.cache/wine/wine-gecko-2.47.4-x86_64.msi.tmp https://dl.winehq.org/wine/wine-gecko/2.47.4/wine-gecko-2.47.4-x86_64.msi
+  mv ~/.cache/wine/wine-gecko-2.47.4-x86_64.msi.tmp ~/.cache/wine/wine-gecko-2.47.4-x86_64.msi
+fi
+
+if [[ ! -f ~/.cache/wine/wine-mono-9.3.0-x86.msi ]]; then
+  mkdir -p ~/.cache/wine
+  wget -q -O ~/.cache/wine/wine-mono-9.3.0-x86.msi.tmp https://dl.winehq.org/wine/wine-mono/9.3.0/wine-mono-9.3.0-x86.msi
+  mv ~/.cache/wine/wine-mono-9.3.0-x86.msi.tmp ~/.cache/wine/wine-mono-9.3.0-x86.msi
+fi
+
+mkdir -p "$WINEPREFIX"
+run wineboot-init wineboot --init
+run winetricks-corefonts "$TOOLS_CACHE/winetricks" -q corefonts
+# (optional) Font for Grasshopper:
+run winetricks-consolas "$TOOLS_CACHE/winetricks" -q consolas
+# TODO: Font Segoe Print on Grasshopper:
+# https://learn.microsoft.com/es-es/typography/font-list/segoe-print
+
+# NOTE: Rhino 7 requires renderer=no3d or renderer=vulkan
+run winetricks-renderer "$TOOLS_CACHE/winetricks" -q renderer=no3d
+run winetricks-vcrun "$TOOLS_CACHE/winetricks" -q vcrun2005 vcrun2010 vcrun2013 vcrun2015
+# NOTE: Rhino 7 and 8 require dotnet48,
+# NOTE: Rhino 7 will not run if it's not installed through winetricks.
+# FIXME: Installing dotnet sometimes hangs with RtlpWaitForCriticalSection on ntdll
+run winetricks-dotnet48 "$TOOLS_CACHE/winetricks" -q dotnet48
+run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
+
+RHINO_INSTALLER_DIR="$SCRIPT_DIR/build/rhino-installer/${RHINO_INSTALLER%%.exe}"
+run cabextract cabextract -d "$RHINO_INSTALLER_DIR" "$TOOLS_CACHE/$RHINO_INSTALLER"
+cat "$RHINO_INSTALLER_DIR/0" | grep -o '<Payload Id[^>]*Packaging="embedded"[^>]*>' | while read -r line ; do
+    src_path="$(echo "$line" | grep -o 'SourcePath="[^"]*"' | cut -d'"' -f2)"
+    dst_path="$(echo "$line" | grep -o 'FilePath="[^"]*"' | cut -d'"' -f2)"
+    dst_path="${dst_path//\\//}"
+    dst_dir="$(dirname "$dst_path")"
+    mkdir -p "$RHINO_INSTALLER_DIR/$dst_dir"
+    mv "$RHINO_INSTALLER_DIR/$src_path" "$RHINO_INSTALLER_DIR/$dst_path"
+done
+
+run rhino.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
+    /quiet \
+    ARPSYSTEMCOMPONENT=1 \
+    MSIFASTINSTALL=7 \
+    DEFER_NET48_REBOOT=1 \
+    ENABLE_AUTOMATIC_UPDATES=0 \
+    SEND_STATISTICS=0 \
+    '/L*V' \
+    'C:\rhino.msi.log'
+
+# run rhiexec.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
+#     /quiet \
+#     ARPSYSTEMCOMPONENT=1 \
+#     MSIFASTINSTALL=7 \
+#     '/L*V' \
+#     'C:\rhiexec.msi.log'
+
+# XXX: Disable McNeel Update Service
+run reg-updater wine reg add 'HKLM\System\CurrentControlSet\Services\McNeelUpdate' /v Start /t reg_dword /d 3 /f
+
+# XXX: Turn off Windows theme to avoid black tooltips
+run reg-theme wine reg add 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ThemeManager' /v ThemeActive /t REG_SZ /d 0 /f
+
+# XXX: wineserver -k can exit with code != 0, ignore it.
+run wineserver-kill wineserver --kill=9 || true

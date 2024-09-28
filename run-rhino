@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -eu
+
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+MAJOR_VERSION=7
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      echo "Usage: $0"
+      echo "  -h, --help: Show this help message"
+      exit 0
+      ;;
+    -v|--version)
+      MAJOR_VERSION="$2"
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+export WINEARCH="${WINEARCH:-win64}"
+export WINEPREFIX="${WINEPREFIX:-$SCRIPT_DIR/wineprefix}"
+
+if [[ $MAJOR_VERSION = 9 || $MAJOR_VERSION = wip ]]; then
+  MAJOR_VERSION="9 WIP"
+fi
+
+RHINO_EXE="$WINEPREFIX/drive_c/Program Files/Rhino ${MAJOR_VERSION}/System/Rhino.exe"
+if [[ ! -f "$RHINO_EXE" ]]; then
+  echo "Rhino ${MAJOR_VERSION} not found at $RHINO_EXE, install with:"
+  echo "  ./install-rhino --version ${MAJOR_VERSION}"
+  exit 1
+fi
+
+exec wine "$RHINO_EXE"

@@ -1,0 +1,18 @@
+ #!/usr/bin/env bash
+ set -eu
+
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+./run-rhino "$@" &
+pid=$!
+sleep 10
+
+# Check if $pid is still alive
+if kill -0 $pid 2>/dev/null; then
+  echo "Rhino is still running"
+  kill -9 $pid || true
+else
+  echo "Rhino crashed"
+  exit 1
+fi

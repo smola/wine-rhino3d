@@ -1,0 +1,28 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  windows-test:
+    runs-on: windows-2019
+    steps:
+      - run: reg query "HKLM\Software\Wow6432Node\Microsoft\Windows\CurrentVersion"
+      - run: reg query "HKLM\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion"
+      - run: reg query "HKLM\Software\Microsoft\Windows\CurrentVersion"
+      - run: reg query "HKLM\Software\Microsoft\Windows NT\CurrentVersion"
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-24.04", "ubuntu-22.04"]
+        version: ["6", "7", "8", "wip"]
+    name: "Test Rhino ${{ matrix.version }} on ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - run: ./ci/install-wine
+      - run: xvfb-run --auto-servernum bash -x ./install-rhino --version ${{ matrix.version }}
+      - run: xvfb-run --auto-servernum bash -x ./ci/test-rhino --version ${{ matrix.version }}

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+# See https://gitlab.winehq.org/wine/wine/-/wikis/Debian-Ubuntu
+
+source /etc/os-release
+sudo dpkg --add-architecture i386
+sudo mkdir -pm755 /etc/apt/keyrings
+sudo wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/${UBUNTU_CODENAME}/winehq-${UBUNTU_CODENAME}.sources
+sudo apt-get update
+sudo apt-get install -y --install-recommends winehq-devel msitools cabextract
+
+# xvfb-run for headless testing
+sudo apt-get install -y xvfb x11-xserver-utils
+
+wine --version
