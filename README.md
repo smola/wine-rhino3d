@@ -12,10 +12,10 @@ Installer for [Rhino 3D](https://www.rhino3d.com/) on [Wine](https://www.winehq.
 
 | Version | Installs | Runs |
 | ------- | -------- | ---- |
-| 6       | Yes      | ?    |
+| 6       | Yes      | Yes  |
 | 7       | Yes      | Yes  |
 | 8       | Yes      | No   |
-| wip     | ?        | ?    |
+| wip     | Yes      | No   |
 
 ## Usage
 
