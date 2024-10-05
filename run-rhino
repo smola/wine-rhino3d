@@ -27,11 +27,13 @@ done
 export WINEARCH="${WINEARCH:-win64}"
 export WINEPREFIX="${WINEPREFIX:-$SCRIPT_DIR/wineprefix}"
 
+VER_SUFFIX="$MAJOR_VERSION"
 if [[ $MAJOR_VERSION = 9 || $MAJOR_VERSION = wip ]]; then
-  MAJOR_VERSION="9 WIP"
+  MAJOR_VERSION="wip"
+  VER_SUFFIX="WIP"
 fi
 
-RHINO_EXE="$WINEPREFIX/drive_c/Program Files/Rhino ${MAJOR_VERSION}/System/Rhino.exe"
+RHINO_EXE="$WINEPREFIX/drive_c/Program Files/Rhino ${VER_SUFFIX}/System/Rhino.exe"
 if [[ ! -f "$RHINO_EXE" ]]; then
   echo "Rhino ${MAJOR_VERSION} not found at $RHINO_EXE, install with:"
   echo "  ./install-rhino --version ${MAJOR_VERSION}"
