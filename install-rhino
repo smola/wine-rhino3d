@@ -98,7 +98,12 @@ run winetricks-consolas "$TOOLS_CACHE/winetricks" -q consolas
 
 # NOTE: Rhino 7 requires renderer=no3d or renderer=vulkan
 run winetricks-renderer "$TOOLS_CACHE/winetricks" -q renderer="$WINE_RENDERER"
-run winetricks-vcrun "$TOOLS_CACHE/winetricks" -q vcrun2005 vcrun2010 vcrun2013 vcrun2015
+run winetricks-vcrun "$TOOLS_CACHE/winetricks" -q vcrun2005 vcrun2010 vcrun2013
+if [[ "$MAJOR_VERSION" = 8 || "$MAJOR_VERSION" = wip ]]; then
+  run winetricks-vcrun2022 "$TOOLS_CACHE/winetricks" -q vcrun2022
+else
+  run winetricks-vcrun2015 "$TOOLS_CACHE/winetricks" -q vcrun2015
+fi
 # NOTE: Rhino 7 and 8 require dotnet48,
 # NOTE: Rhino 7 will not run if it's not installed through winetricks.
 # FIXME: Installing dotnet sometimes hangs with RtlpWaitForCriticalSection on ntdll
