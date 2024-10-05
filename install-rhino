@@ -26,12 +26,16 @@ done
 
 export WINEARCH="${WINEARCH:-win64}"
 export WINEPREFIX="${WINEPREFIX:-$SCRIPT_DIR/wineprefix}"
-export TOOLS_CACHE="$SCRIPT_DIR/build/tools"
+export BUILD_DIR="$SCRIPT_DIR/build"
+export TOOLS_CACHE="$BUILD_DIR/tools"
+export LOGS_DIR="$BUILD_DIR/logs"
+
+mkdir -p "$BUILD_DIR" "$TOOLS_CACHE" "$LOGS_DIR"
 
 run() {
   local log_name="$1" log_path
   shift
-  log_path="$SCRIPT_DIR/wineprefix/$log_name.log"
+  log_path="$LOGS_DIR/$log_name.log"
   echo "Running: $*"
   echo "Running: $*" >"$log_path"
   "$@" >>"$log_path" 2>&1
@@ -115,7 +119,7 @@ sed \
 msibuild rhino.msi -i InstallExecuteSequence.idt
 cd -
 
-run rhino.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
+run msiexec-rhino.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
     /quiet \
     ARPSYSTEMCOMPONENT=1 \
     MSIFASTINSTALL=7 \
@@ -124,6 +128,10 @@ run rhino.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
     SEND_STATISTICS=0 \
     '/L*V' \
     'C:\rhino.msi.log'
+
+if [[ -e $WINEPREFIX/drive_c/rhino.msi.log ]]; then
+  mv $WINEPREFIX/drive_c/rhino.msi.log $LOGS_DIR/rhino.msi.log
+fi
 
 # run rhiexec.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
 #     /quiet \
