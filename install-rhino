@@ -105,6 +105,16 @@ cat "$RHINO_INSTALLER_DIR/0" | grep -o '<Payload Id[^>]*Packaging="embedded"[^>]
     mv "$RHINO_INSTALLER_DIR/$src_path" "$RHINO_INSTALLER_DIR/$dst_path"
 done
 
+echo "Patching Rhino installer for https://bugs.winehq.org/show_bug.cgi?id=56703"
+cd "$RHINO_INSTALLER_DIR"
+msiinfo export rhino.msi InstallExecuteSequence > InstallExecuteSequence.idt
+sed \
+    -e 's~^InstallCertificates\t.*\t\([0-9]*\)~InstallCertificates\tSKIP_INSTALL_CERTIFICATES="0"\t\1~g' \
+    -e 's~^UninstallCertificates\t.*\t\([0-9]*\)~UninstallCertificates\tSKIP_UNINSTALL_CERTIFICATES="0"\t\1~g' \
+    -i InstallExecuteSequence.idt
+msibuild rhino.msi -i InstallExecuteSequence.idt
+cd -
+
 run rhino.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
     /quiet \
     ARPSYSTEMCOMPONENT=1 \
