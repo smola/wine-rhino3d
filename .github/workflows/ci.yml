@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - run: ./ci/install-wine
-      - run: xvfb-run --auto-servernum bash -x ./install-rhino --version ${{ matrix.version }}
+      - run: xvfb-run --auto-servernum bash -x ./install-rhino --version ${{ matrix.version }} --renderer no3d
       - run: xvfb-run --auto-servernum bash -x ./ci/test-rhino --version ${{ matrix.version }}
       - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         if: ${{ ! cancelled() }}

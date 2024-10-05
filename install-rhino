@@ -5,12 +5,19 @@ SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 MAJOR_VERSION=7
+WINE_RENDERER=no3d
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
       echo "Usage: $0"
-      echo "  -h, --help: Show this help message"
+      echo "  -h, --help                Show this help message"
+      echo "  --renderer <renderer>     Set the renderer to use (no3d, gl, vulkan)"
+      echo "  -v, --version <version>   Set the major version of Rhino to install (6, 7, 8, wip)"
       exit 0
+      ;;
+    --renderer)
+      export WINE_RENDERER="$2"
+      shift
       ;;
     -v|--version)
       MAJOR_VERSION="$2"
@@ -90,7 +97,7 @@ run winetricks-consolas "$TOOLS_CACHE/winetricks" -q consolas
 # https://learn.microsoft.com/es-es/typography/font-list/segoe-print
 
 # NOTE: Rhino 7 requires renderer=no3d or renderer=vulkan
-run winetricks-renderer "$TOOLS_CACHE/winetricks" -q renderer=no3d
+run winetricks-renderer "$TOOLS_CACHE/winetricks" -q renderer="$WINE_RENDERER"
 run winetricks-vcrun "$TOOLS_CACHE/winetricks" -q vcrun2005 vcrun2010 vcrun2013 vcrun2015
 # NOTE: Rhino 7 and 8 require dotnet48,
 # NOTE: Rhino 7 will not run if it's not installed through winetricks.
