@@ -26,3 +26,12 @@ jobs:
       - run: ./ci/install-wine
       - run: xvfb-run --auto-servernum bash -x ./install-rhino --version ${{ matrix.version }}
       - run: xvfb-run --auto-servernum bash -x ./ci/test-rhino --version ${{ matrix.version }}
+      - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        if: ${{ ! cancelled() }}
+        with:
+          name: rhino-${{ matrix.version }}-${{ matrix.os }}-logs
+          path: build/logs/
+          if-no-files-found: warn
+          compression-level: 9
+          overwrite: false
+          include-hidden-files: false
