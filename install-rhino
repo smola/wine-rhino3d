@@ -104,6 +104,9 @@ run winetricks-vcrun "$TOOLS_CACHE/winetricks" -q vcrun2005 vcrun2010 vcrun2013 
 # FIXME: Installing dotnet sometimes hangs with RtlpWaitForCriticalSection on ntdll
 run winetricks-dotnet48 "$TOOLS_CACHE/winetricks" -q dotnet48
 run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
+if [[ $MAJOR_VERSION = 8 || $MAJOR_VERSION = wip ]]; then
+  run winetricks-dotnetdesktop7 "$TOOLS_CACHE/winetricks" -q dotnetdesktop7
+fi
 
 RHINO_INSTALLER_DIR="$SCRIPT_DIR/build/rhino-installer/${RHINO_INSTALLER%%.exe}"
 run cabextract cabextract -d "$RHINO_INSTALLER_DIR" "$TOOLS_CACHE/$RHINO_INSTALLER"
