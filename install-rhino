@@ -87,14 +87,18 @@ fi
 
 mkdir -p "$WINEPREFIX"
 run wineboot-init "$WINE" wineboot --init
-run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
+
+# NOTE: Rhino 7 and 8 require dotnet48,
+# FIXME: Installing dotnet48 sometimes hangs with RtlpWaitForCriticalSection on ntdll
+run winetricks-dotnet40 "$TOOLS_CACHE/winetricks" -q dotnet48
+
 run winetricks-corefonts "$TOOLS_CACHE/winetricks" -q corefonts
 # (optional) Font for Grasshopper:
 run winetricks-consolas "$TOOLS_CACHE/winetricks" -q consolas
 # TODO: Font Segoe Print on Grasshopper:
 # https://learn.microsoft.com/es-es/typography/font-list/segoe-print
 
-# NOTE: Rhino 7 requires renderer=no3d or renderer=vulkan
+# NOTE: Rhino 7+ requires renderer=no3d or renderer=vulkan
 run winetricks-renderer "$TOOLS_CACHE/winetricks" -q renderer="$WINE_RENDERER"
 run winetricks-vcrun "$TOOLS_CACHE/winetricks" -q vcrun2005 vcrun2010 vcrun2013
 if [[ "$MAJOR_VERSION" = 8 || "$MAJOR_VERSION" = wip ]]; then
@@ -103,61 +107,58 @@ else
   run winetricks-vcrun2015 "$TOOLS_CACHE/winetricks" -q vcrun2015
 fi
 
-# NOTE: Rhino 7 and 8 require dotnet48,
-# FIXME: Installing dotnet48 with winetricks sometimes hangs with RtlpWaitForCriticalSection on ntdll
-if [[ ! -f "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" ]]; then
-  wget -O "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" https://download.visualstudio.microsoft.com/download/pr/7afca223-55d2-470a-8edc-6a1739ae3252/abd170b4b0ec15ad0222a809b761a036/ndp48-x86-x64-allos-enu.exe
-  mv "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe"
-fi
-run dotnet48 "$WINE" "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" /q /norestart
-
 run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 if [[ $MAJOR_VERSION = 8 || $MAJOR_VERSION = wip ]]; then
   run winetricks-dotnetdesktop7 "$TOOLS_CACHE/winetricks" -q dotnetdesktop7
 fi
 
 if [[ $REQUIREMENTS_ONLY = false ]]; then
-  RHINO_INSTALLER_DIR="$SCRIPT_DIR/build/rhino-installer/${RHINO_INSTALLER%%.exe}"
-  run cabextract cabextract -d "$RHINO_INSTALLER_DIR" "$TOOLS_CACHE/$RHINO_INSTALLER"
-  cat "$RHINO_INSTALLER_DIR/0" | grep -o '<Payload Id[^>]*Packaging="embedded"[^>]*>' | while read -r line ; do
-      src_path="$(echo "$line" | grep -o 'SourcePath="[^"]*"' | cut -d'"' -f2)"
-      dst_path="$(echo "$line" | grep -o 'FilePath="[^"]*"' | cut -d'"' -f2)"
-      dst_path="${dst_path//\\//}"
-      dst_dir="$(dirname "$dst_path")"
-      mkdir -p "$RHINO_INSTALLER_DIR/$dst_dir"
-      mv "$RHINO_INSTALLER_DIR/$src_path" "$RHINO_INSTALLER_DIR/$dst_path"
-  done
+  if [[ $MAJOR_VERSION = 8 || $MAJOR_VERSION = wip ]]; then
+    RHINO_INSTALLER_DIR="$SCRIPT_DIR/build/rhino-installer/${RHINO_INSTALLER%%.exe}"
+    run cabextract cabextract -d "$RHINO_INSTALLER_DIR" "$TOOLS_CACHE/$RHINO_INSTALLER"
+    cat "$RHINO_INSTALLER_DIR/0" | grep -o '<Payload Id[^>]*Packaging="embedded"[^>]*>' | while read -r line ; do
+        src_path="$(echo "$line" | grep -o 'SourcePath="[^"]*"' | cut -d'"' -f2)"
+        dst_path="$(echo "$line" | grep -o 'FilePath="[^"]*"' | cut -d'"' -f2)"
+        dst_path="${dst_path//\\//}"
+        dst_dir="$(dirname "$dst_path")"
+        mkdir -p "$RHINO_INSTALLER_DIR/$dst_dir"
+        mv "$RHINO_INSTALLER_DIR/$src_path" "$RHINO_INSTALLER_DIR/$dst_path"
+    done
 
-  echo "Patching Rhino installer for https://bugs.winehq.org/show_bug.cgi?id=56703"
-  cd "$RHINO_INSTALLER_DIR"
-  msiinfo export rhino.msi InstallExecuteSequence > InstallExecuteSequence.idt
-  sed \
-      -e 's~^InstallCertificates\t.*\t\([0-9]*\)~InstallCertificates\tSKIP_INSTALL_CERTIFICATES="0"\t\1~g' \
-      -e 's~^UninstallCertificates\t.*\t\([0-9]*\)~UninstallCertificates\tSKIP_UNINSTALL_CERTIFICATES="0"\t\1~g' \
-      -i InstallExecuteSequence.idt
-  msibuild rhino.msi -i InstallExecuteSequence.idt
-  cd -
+    echo "Patching Rhino installer for https://bugs.winehq.org/show_bug.cgi?id=56703"
+    cd "$RHINO_INSTALLER_DIR"
+    msiinfo export rhino.msi InstallExecuteSequence > InstallExecuteSequence.idt
+    sed \
+        -e 's~^InstallCertificates\t.*\t\([0-9]*\)~InstallCertificates\tSKIP_INSTALL_CERTIFICATES="0"\t\1~g' \
+        -e 's~^UninstallCertificates\t.*\t\([0-9]*\)~UninstallCertificates\tSKIP_UNINSTALL_CERTIFICATES="0"\t\1~g' \
+        -i InstallExecuteSequence.idt
+    msibuild rhino.msi -i InstallExecuteSequence.idt
+    cd -
 
-  run msiexec-rhino.msi "$WINE" msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
-      /quiet \
-      ARPSYSTEMCOMPONENT=1 \
-      MSIFASTINSTALL=7 \
-      DEFER_NET48_REBOOT=1 \
-      ENABLE_AUTOMATIC_UPDATES=0 \
-      SEND_STATISTICS=0 \
-      '/L*V' \
-      'C:\rhino.msi.log'
+    run msiexec-rhino.msi "$WINE" msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
+        /quiet \
+        ARPSYSTEMCOMPONENT=1 \
+        MSIFASTINSTALL=7 \
+        DEFER_NET48_REBOOT=1 \
+        ENABLE_AUTOMATIC_UPDATES=0 \
+        SEND_STATISTICS=0 \
+        '/L*V' \
+        'C:\rhino.msi.log'
 
-  if [[ -e $WINEPREFIX/drive_c/rhino.msi.log ]]; then
-    mv $WINEPREFIX/drive_c/rhino.msi.log $LOGS_DIR/rhino.msi.log
+    if [[ -e $WINEPREFIX/drive_c/rhino.msi.log ]]; then
+      mv $WINEPREFIX/drive_c/rhino.msi.log $LOGS_DIR/rhino.msi.log
+    fi
+
+    # run rhiexec.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
+    #     /quiet \
+    #     ARPSYSTEMCOMPONENT=1 \
+    #     MSIFASTINSTALL=7 \
+    #     '/L*V' \
+    #     'C:\rhiexec.msi.log'
+  else
+    # XXX: Rhino 7 GUI installer crashes on mshtml on wine 9.16+, https://bugs.winehq.org/show_bug.cgi?id=57248
+    run rhino-installer wine "$TOOLS_CACHE/$RHINO_INSTALLER" -package -quiet SEND_STATISTICS=0 ENABLE_AUTOMATIC_UPDATES=0
   fi
-
-  # run rhiexec.msi "$WINE" msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
-  #     /quiet \
-  #     ARPSYSTEMCOMPONENT=1 \
-  #     MSIFASTINSTALL=7 \
-  #     '/L*V' \
-  #     'C:\rhiexec.msi.log'
 
   # XXX: Disable McNeel Update Service
   run reg-updater "$WINE" reg add 'HKLM\System\CurrentControlSet\Services\McNeelUpdate' /v Start /t reg_dword /d 3 /f
