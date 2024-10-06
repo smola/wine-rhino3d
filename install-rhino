@@ -86,6 +86,7 @@ fi
 
 mkdir -p "$WINEPREFIX"
 run wineboot-init wineboot --init
+run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 run winetricks-corefonts "$TOOLS_CACHE/winetricks" -q corefonts
 # (optional) Font for Grasshopper:
 run winetricks-consolas "$TOOLS_CACHE/winetricks" -q consolas
@@ -100,10 +101,15 @@ if [[ "$MAJOR_VERSION" = 8 || "$MAJOR_VERSION" = wip ]]; then
 else
   run winetricks-vcrun2015 "$TOOLS_CACHE/winetricks" -q vcrun2015
 fi
+
 # NOTE: Rhino 7 and 8 require dotnet48,
-# NOTE: Rhino 7 will not run if it's not installed through winetricks.
-# FIXME: Installing dotnet sometimes hangs with RtlpWaitForCriticalSection on ntdll
-run winetricks-dotnet48 "$TOOLS_CACHE/winetricks" -q dotnet48
+# FIXME: Installing dotnet48 with winetricks sometimes hangs with RtlpWaitForCriticalSection on ntdll
+if [[ ! -f "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" ]]; then
+  wget -O "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" https://download.visualstudio.microsoft.com/download/pr/7afca223-55d2-470a-8edc-6a1739ae3252/abd170b4b0ec15ad0222a809b761a036/ndp48-x86-x64-allos-enu.exe
+  mv "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe"
+fi
+run dotnet48 wine "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" /q /norestart
+
 run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 if [[ $MAJOR_VERSION = 8 || $MAJOR_VERSION = wip ]]; then
   run winetricks-dotnetdesktop7 "$TOOLS_CACHE/winetricks" -q dotnetdesktop7
