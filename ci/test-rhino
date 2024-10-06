@@ -6,7 +6,7 @@ cd "$SCRIPT_DIR/.."
 
 ./run-rhino "$@" &
 pid=$!
-sleep 10
+sleep 30
 
 # Check if $pid is still alive
 if kill -0 $pid 2>/dev/null; then
