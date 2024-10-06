@@ -55,15 +55,6 @@ if [[ -z "$RHINO_INSTALLER_URL" ]]; then
 fi
 RHINO_INSTALLER="$(basename "$RHINO_INSTALLER_URL")"
 
-# wine-9.0, check that major is at least 9
-WINE_VERSION="$(wine --version)"
-WINE_VERSION="${WINE_VERSION/wine-}"
-WINE_VERSION="${WINE_VERSION%%.*}"
-if [[ "$WINE_VERSION" -lt 9 ]]; then
-  echo "Wine version is too old, please install wine-9.0 or newer"
-  exit 1
-fi
-
 if [[ ! -e "$TOOLS_CACHE/winetricks" ]]; then
   mkdir -p "$TOOLS_CACHE"
   wget -q -O "$TOOLS_CACHE/winetricks" "https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
