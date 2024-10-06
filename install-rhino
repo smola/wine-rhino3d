@@ -157,6 +157,10 @@ if [[ $REQUIREMENTS_ONLY = false ]]; then
 
   # XXX: Turn off Windows theme to avoid black tooltips
   run reg-theme wine reg add 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ThemeManager' /v ThemeActive /t REG_SZ /d 0 /f
+
+  # XXX: Adjust DPI to avoid tiny text
+  run reg-dpi-1 wine reg add 'HKEY_CURRENT_USER\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d 192 /f
+  run reg-dpi-2 wine reg add 'HKEY_CURRENT_USER\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d 192 /f
 fi
 
 # XXX: wineserver -k can exit with code != 0, ignore it.
