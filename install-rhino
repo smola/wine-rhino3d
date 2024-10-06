@@ -145,6 +145,11 @@ if [[ $REQUIREMENTS_ONLY = false ]]; then
     mv $WINEPREFIX/drive_c/rhino.msi.log $LOGS_DIR/rhino.msi.log
   fi
 
+  run msiexec-langpack wine msiexec /i "$RHINO_INSTALLER_DIR/redist/en-us/LanguagePack.msi" \
+      /quiet \
+      ARPSYSTEMCOMPONENT=1 \
+      MSIFASTINSTALL=7
+
   # run rhiexec.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
   #     /quiet \
   #     ARPSYSTEMCOMPONENT=1 \
