@@ -88,9 +88,12 @@ fi
 mkdir -p "$WINEPREFIX"
 run wineboot-init "$WINE" wineboot --init
 
+LC_ALL=C run winetricks-dotnet40 "$TOOLS_CACHE/winetricks" -q dotnet40
+run wineboot-k wineboot -k
+
 # NOTE: Rhino 7 and 8 require dotnet48,
 # FIXME: Installing dotnet48 sometimes hangs with RtlpWaitForCriticalSection on ntdll
-run winetricks-dotnet40 "$TOOLS_CACHE/winetricks" -q dotnet48
+LC_ALL=C run winetricks-dotnet48 "$TOOLS_CACHE/winetricks" -q dotnet48
 
 run winetricks-corefonts "$TOOLS_CACHE/winetricks" -q corefonts
 # (optional) Font for Grasshopper:
