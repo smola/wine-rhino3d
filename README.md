@@ -2,6 +2,9 @@
 
 Installer for [Rhino 3D](https://www.rhino3d.com/) on [Wine](https://www.winehq.org/).
 
+> [!CAUTION]
+> wine-rhino3d currently does not work. [This post](https://discourse.mcneel.com/t/rhino-on-linux/8820/604?u=smola) describes the current status, and the steps to get it working with [CrossOver](https://www.codeweavers.com/). As Wine bugs are fixed, or new workarounds are found, this project will be updated again.
+
 > [!NOTE]
 > This project is not affiliated with or officially supported by McNeel.
 
