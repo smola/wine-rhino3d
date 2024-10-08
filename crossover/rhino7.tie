@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<c4p>
+  <autorun appid="com.codeweavers.c4.21122" />
+  <applications>
+    <app appid="com.codeweavers.c4.21122" timestamp="2024-10-16T15:59:39-05:00">
+      <cxversion product="cxoffice">24.0</cxversion>
+      <name>Rhinoceros 7</name>
+      <name lang="en">Rhinoceros 7</name>
+      <appprofile>
+        <description>Rhinoceros is a 3D modelling program specializing in NURBS and surface modelling for industrial design, CAD, automotive design, and related fields.</description>
+        <description lang="en">Rhinoceros is a 3D modelling program specializing in NURBS and surface modelling for industrial design, CAD, automotive design, and related fields.</description>
+        <flag>application</flag>
+        <category>3D &amp; Scientific, Technical &amp; Math/CAD</category>
+        <installedregistryglob>
+          <key>HKEY_LOCAL_MACHINE/Software/McNeel/Rhinoceros/7.0</key>
+          <value/>
+          <data/>
+        </installedregistryglob>
+        <bottletemplate>win10_64</bottletemplate>
+        <bottletemplate>win11_64</bottletemplate>
+        <downloadurl>https://files.mcneel.com/dujour/exe/20240416/rhino_en-us_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="en">https://files.mcneel.com/dujour/exe/20240416/rhino_en-us_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="zh-cn">https://files.mcneel.com/dujour/exe/20240416/rhino_zh-cn_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="cs">https://files.mcneel.com/dujour/exe/20240416/rhino_cs-cz_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="fr">https://files.mcneel.com/dujour/exe/20240416/rhino_fr-fr_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="de">https://files.mcneel.com/dujour/exe/20240416/rhino_de-de_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="it">https://files.mcneel.com/dujour/exe/20240416/rhino_it-it_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="ja">https://files.mcneel.com/dujour/exe/20240416/rhino_ja-jp_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="ko">https://files.mcneel.com/dujour/exe/20240416/rhino_ko-kr_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="pl">https://files.mcneel.com/dujour/exe/20240416/rhino_pl-pl_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="pt">https://files.mcneel.com/dujour/exe/20240416/rhino_pt-pt_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="ru">https://files.mcneel.com/dujour/exe/20240416/rhino_ru-ru_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="es">https://files.mcneel.com/dujour/exe/20240416/rhino_es-es_7.37.24107.15001.exe</downloadurl>
+        <downloadurl lang="zh-tw">https://files.mcneel.com/dujour/exe/20240416/rhino_zh-tw_7.37.24107.15001.exe</downloadurl>
+        <downloadpageurl>https://www.rhino3d.com/download/archive/rhino/7/latest/</downloadpageurl>
+      </appprofile>
+      <installprofile>
+        <comment>
+          Requires dependencies:
+          Core Fonts
+          Microsoft Visual C++ 2005 (8.0) Redistributable (64-bit)
+          Microsoft Visual C++ 2010 (10.0) Redistributable (64-bit)
+          Microsoft Visual C++ 2013 (12.0) Redistributable Runtime (64-bit)
+          Microsoft Visual C++ 2015 (14.0) Redistributable Runtime (64-bit)
+          Microsoft .NET Framework 4.8
+        </comment>
+        <predependency>com.codeweavers.c4.6959</predependency>
+        <predependency>com.codeweavers.c4.14307</predependency>
+        <!-- <predependency>com.codeweavers.c4.13529</predependency> -->
+        <predependency>com.codeweavers.c4.14341</predependency>
+        <predependency>com.codeweavers.c4.14425</predependency>
+        <predependency>com.codeweavers.c4.16255</predependency>
+        <preinstallregistry>
+          <key>HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ThemeManager</key>
+          <value>
+            <name>ThemeActive</name>
+            <data>1</data>
+          </value>
+        </preinstallregistry>
+        <preinstallregistry>
+          <key>HKEY_CURRENT_USER\Software\Wine\Direct3D</key>
+          <value>
+            <name>renderer</name>
+            <data>vulkan</data>
+          </value>
+        </preinstallregistry>
+        <installersilentoption>-quiet</installersilentoption>
+      </installprofile>
+    </app>
+  </applications>
+</c4p>
