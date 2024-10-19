@@ -36,6 +36,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+export WINE="${WINE:-wine}"
 export WINEARCH="${WINEARCH:-win64}"
 export WINEPREFIX="${WINEPREFIX:-$SCRIPT_DIR/wineprefix}"
 export BUILD_DIR="$SCRIPT_DIR/build"
@@ -85,7 +86,7 @@ if [[ ! -f ~/.cache/wine/wine-mono-9.3.0-x86.msi ]]; then
 fi
 
 mkdir -p "$WINEPREFIX"
-run wineboot-init wineboot --init
+run wineboot-init "$WINE" wineboot --init
 run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 run winetricks-corefonts "$TOOLS_CACHE/winetricks" -q corefonts
 # (optional) Font for Grasshopper:
@@ -108,7 +109,7 @@ if [[ ! -f "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" ]]; then
   wget -O "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" https://download.visualstudio.microsoft.com/download/pr/7afca223-55d2-470a-8edc-6a1739ae3252/abd170b4b0ec15ad0222a809b761a036/ndp48-x86-x64-allos-enu.exe
   mv "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe"
 fi
-run dotnet48 wine "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" /q /norestart
+run dotnet48 "$WINE" "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" /q /norestart
 
 run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 if [[ $MAJOR_VERSION = 8 || $MAJOR_VERSION = wip ]]; then
@@ -137,7 +138,7 @@ if [[ $REQUIREMENTS_ONLY = false ]]; then
   msibuild rhino.msi -i InstallExecuteSequence.idt
   cd -
 
-  run msiexec-rhino.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
+  run msiexec-rhino.msi "$WINE" msiexec /i "$RHINO_INSTALLER_DIR/rhino.msi" \
       /quiet \
       ARPSYSTEMCOMPONENT=1 \
       MSIFASTINSTALL=7 \
@@ -151,7 +152,7 @@ if [[ $REQUIREMENTS_ONLY = false ]]; then
     mv $WINEPREFIX/drive_c/rhino.msi.log $LOGS_DIR/rhino.msi.log
   fi
 
-  # run rhiexec.msi wine msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
+  # run rhiexec.msi "$WINE" msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
   #     /quiet \
   #     ARPSYSTEMCOMPONENT=1 \
   #     MSIFASTINSTALL=7 \
@@ -159,15 +160,15 @@ if [[ $REQUIREMENTS_ONLY = false ]]; then
   #     'C:\rhiexec.msi.log'
 
   # XXX: Disable McNeel Update Service
-  run reg-updater wine reg add 'HKLM\System\CurrentControlSet\Services\McNeelUpdate' /v Start /t reg_dword /d 3 /f
+  run reg-updater "$WINE" reg add 'HKLM\System\CurrentControlSet\Services\McNeelUpdate' /v Start /t reg_dword /d 3 /f
 
   # XXX: Turn off Windows theme to avoid black tooltips
-  run reg-theme wine reg add 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ThemeManager' /v ThemeActive /t REG_SZ /d 0 /f
+  run reg-theme "$WINE" reg add 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ThemeManager' /v ThemeActive /t REG_SZ /d 0 /f
 
   # XXX: Adjust DPI to avoid tiny text
-  run reg-dpi-1 wine reg add 'HKEY_CURRENT_USER\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d 192 /f
-  run reg-dpi-2 wine reg add 'HKEY_CURRENT_USER\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d 192 /f
+  run reg-dpi-1 "$WINE" reg add 'HKEY_CURRENT_USER\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d 192 /f
+  run reg-dpi-2 "$WINE" reg add 'HKEY_CURRENT_USER\Software\Wine\Fonts' /v LogPixels /t REG_DWORD /d 192 /f
 fi
 
 # XXX: wineserver -k can exit with code != 0, ignore it.
-run wineserver-kill wineserver --kill=9 || true
+run wineserver-kill "$WINE" wineserver --kill=9 || true
