@@ -88,8 +88,10 @@ fi
 mkdir -p "$WINEPREFIX"
 run wineboot-init "$WINE" wineboot --init
 
+# NOTE: Installing dotnet20 seems to be prevent rundll32.exe error on wineboot.
+run winetricks-dotnet20 "$TOOLS_CACHE/winetricks" -q dotnet20
 LC_ALL=C run winetricks-dotnet40 "$TOOLS_CACHE/winetricks" -q dotnet40
-run wineboot-k wineboot -k
+run wineboot-f "$WINE" wineboot -f
 
 # NOTE: Rhino 7 and 8 require dotnet48,
 # FIXME: Installing dotnet48 sometimes hangs with RtlpWaitForCriticalSection on ntdll
@@ -110,10 +112,11 @@ else
   run winetricks-vcrun2015 "$TOOLS_CACHE/winetricks" -q vcrun2015
 fi
 
-run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 if [[ $MAJOR_VERSION = 8 || $MAJOR_VERSION = wip ]]; then
   run winetricks-dotnetdesktop7 "$TOOLS_CACHE/winetricks" -q dotnetdesktop7
 fi
+
+run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 
 if [[ $REQUIREMENTS_ONLY = false ]]; then
   # XXX: Rhino 7 GUI installer crashes on mshtml on wine 9.16+, https://bugs.winehq.org/show_bug.cgi?id=57248
