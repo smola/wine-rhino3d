@@ -2,16 +2,19 @@
 set -eu
 
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CALLER_DIR="$PWD"
 cd "$SCRIPT_DIR"
 
 MAJOR_VERSION=7
 WINE_RENDERER=no3d
 REQUIREMENTS_ONLY=false
+RHINO_INSTALLER_PATH=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
       echo "Usage: $0"
       echo "  -h, --help                Show this help message"
+      echo "  --installer <path>        Use a local Rhino installer (e.g. a localized one) instead of downloading it"
       echo "  --renderer <renderer>     Set the renderer to use (no3d, gl, vulkan)"
       echo "  --requirements-only       Only install the requirements, do not install Rhino"
       echo "  -v, --version <version>   Set the major version of Rhino to install (6, 7, 8, wip)"
@@ -19,6 +22,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --renderer)
       export WINE_RENDERER="$2"
+      shift
+      ;;
+    --installer)
+      RHINO_INSTALLER_PATH="$(cd "$CALLER_DIR" && realpath "$2")"
       shift
       ;;
     --requirements-only)
@@ -54,12 +61,16 @@ run() {
   "$@" >>"$log_path" 2>&1
 }
 
-RHINO_INSTALLER_URL="$(curl -s -D - "https://www.rhino3d.com/www-api/download/direct/?slug=rhino-for-windows/$MAJOR_VERSION/latest/" -o /dev/null | grep '^Location' | cut -d' ' -f2 | sed -e 's~[\r\n]~~g')"
-if [[ -z "$RHINO_INSTALLER_URL" ]]; then
-  echo "Failed to get Rhino installer URL"
-  exit 1
+if [[ -n "$RHINO_INSTALLER_PATH" ]]; then
+  RHINO_INSTALLER="$(basename "$RHINO_INSTALLER_PATH")"
+else
+  RHINO_INSTALLER_URL="$(curl -s -D - "https://www.rhino3d.com/www-api/download/direct/?slug=rhino-for-windows/$MAJOR_VERSION/latest/" -o /dev/null | grep '^Location' | cut -d' ' -f2 | sed -e 's~[\r\n]~~g')"
+  if [[ -z "$RHINO_INSTALLER_URL" ]]; then
+    echo "Failed to get Rhino installer URL"
+    exit 1
+  fi
+  RHINO_INSTALLER="$(basename "$RHINO_INSTALLER_URL")"
 fi
-RHINO_INSTALLER="$(basename "$RHINO_INSTALLER_URL")"
 
 if [[ ! -e "$TOOLS_CACHE/winetricks" ]]; then
   mkdir -p "$TOOLS_CACHE"
@@ -67,7 +78,9 @@ if [[ ! -e "$TOOLS_CACHE/winetricks" ]]; then
   chmod +x "$TOOLS_CACHE/winetricks"
 fi
 
-if [[ ! -e "$TOOLS_CACHE/$RHINO_INSTALLER" ]]; then
+if [[ -n "$RHINO_INSTALLER_PATH" ]]; then
+  cp -f "$RHINO_INSTALLER_PATH" "$TOOLS_CACHE/$RHINO_INSTALLER"
+elif [[ ! -e "$TOOLS_CACHE/$RHINO_INSTALLER" ]]; then
   mkdir -p "$TOOLS_CACHE"
   wget -q -O "$TOOLS_CACHE/$RHINO_INSTALLER" "$RHINO_INSTALLER_URL"
 fi
@@ -105,11 +118,15 @@ fi
 
 # NOTE: Rhino 7 and 8 require dotnet48,
 # FIXME: Installing dotnet48 with winetricks sometimes hangs with RtlpWaitForCriticalSection on ntdll
-if [[ ! -f "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" ]]; then
-  wget -O "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" https://download.visualstudio.microsoft.com/download/pr/7afca223-55d2-470a-8edc-6a1739ae3252/abd170b4b0ec15ad0222a809b761a036/ndp48-x86-x64-allos-enu.exe
-  mv "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe.tmp" "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe"
+# XXX: Running ndp48 directly is not enough: wine-mono registers a fake .NET 4.8
+# (NDP\v4\Full Release), so the installer exits with "already installed" and
+# Rhino silently runs on Mono. winetricks removes Mono and sets mscoree=native.
+if [[ ! -f ~/.cache/winetricks/dotnet48/ndp48-x86-x64-allos-enu.exe ]]; then
+  mkdir -p ~/.cache/winetricks/dotnet48
+  wget -O ~/.cache/winetricks/dotnet48/ndp48-x86-x64-allos-enu.exe.tmp https://download.visualstudio.microsoft.com/download/pr/7afca223-55d2-470a-8edc-6a1739ae3252/abd170b4b0ec15ad0222a809b761a036/ndp48-x86-x64-allos-enu.exe
+  mv ~/.cache/winetricks/dotnet48/ndp48-x86-x64-allos-enu.exe.tmp ~/.cache/winetricks/dotnet48/ndp48-x86-x64-allos-enu.exe
 fi
-run dotnet48 "$WINE" "$TOOLS_CACHE/ndp48-x86-x64-allos-enu.exe" /q /norestart
+run winetricks-dotnet48 "$TOOLS_CACHE/winetricks" -q dotnet48
 
 run winetricks-win11 "$TOOLS_CACHE/winetricks" -q win11
 if [[ $MAJOR_VERSION = 8 || $MAJOR_VERSION = wip ]]; then
@@ -148,16 +165,32 @@ if [[ $REQUIREMENTS_ONLY = false ]]; then
       '/L*V' \
       'C:\rhino.msi.log'
 
-  if [[ -e $WINEPREFIX/drive_c/rhino.msi.log ]]; then
-    mv $WINEPREFIX/drive_c/rhino.msi.log $LOGS_DIR/rhino.msi.log
+  # Localized installers (e.g. rhino_fr-fr_*.exe) bundle a language pack
+  for lang_pack in "$RHINO_INSTALLER_DIR"/redist/*/LanguagePack.msi; do
+    [[ -f "$lang_pack" ]] || continue
+    run "msiexec-langpack-$(basename "$(dirname "$lang_pack")")" "$WINE" msiexec /i "$lang_pack" /quiet ARPSYSTEMCOMPONENT=1
+  done
+
+  if [[ -e "$WINEPREFIX/drive_c/rhino.msi.log" ]]; then
+    mv "$WINEPREFIX/drive_c/rhino.msi.log" "$LOGS_DIR/rhino.msi.log"
   fi
 
-  # run rhiexec.msi "$WINE" msiexec /i "$RHINO_INSTALLER_DIR/rhinoexec.msi" \
-  #     /quiet \
-  #     ARPSYSTEMCOMPONENT=1 \
-  #     MSIFASTINSTALL=7 \
-  #     '/L*V' \
-  #     'C:\rhiexec.msi.log'
+  # Rhino Installer Engine, needed to deploy .rhi packages such as the
+  # localization package dropped by LanguagePack.msi. Without it, parts of
+  # the UI (toolbar tabs, Properties panel) stay in English.
+  if [[ -f "$RHINO_INSTALLER_DIR/rhiexec.msi" ]]; then
+    run msiexec-rhiexec.msi "$WINE" msiexec /i "$RHINO_INSTALLER_DIR/rhiexec.msi" \
+        /quiet \
+        ARPSYSTEMCOMPONENT=1 \
+        MSIFASTINSTALL=7
+    for rhi in "$WINEPREFIX"/drive_c/ProgramData/McNeel/Rhinoceros/*/Packages/*.rhi; do
+      [[ -f "$rhi" ]] || continue
+      run "rhiexec-$(basename "$rhi" .rhi | tr -c 'A-Za-z0-9-' _)" "$WINE" \
+          'C:\Program Files\McNeel\Rhino Installer Engine\x64\rhiexec.exe' \
+          "$("$WINE" winepath -w "$rhi" 2>/dev/null)" \
+          /silent
+    done
+  fi
 
   # XXX: Disable McNeel Update Service
   run reg-updater "$WINE" reg add 'HKLM\System\CurrentControlSet\Services\McNeelUpdate' /v Start /t reg_dword /d 3 /f

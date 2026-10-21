@@ -47,6 +47,13 @@ cd wine-rhino3d
 ./install-rhino --version 7
 ```
 
+If you already have a Rhino installer, including a localized one such as
+`rhino_fr-fr_*.exe`, you can use it instead of downloading the English one:
+
+```
+./install-rhino --version 6 --installer /path/to/rhino_fr-fr_6.35.21222.17001.exe
+```
+
 ### 4. Run Rhino
 
 ```
